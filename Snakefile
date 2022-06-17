@@ -45,8 +45,38 @@ rule all:
         SALMON_QUANT + "/agg_quant/" + "aggr_quant.isoform.TMM.EXPR.matrix",
 
         # diff exp
-        DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix"
+        DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
 
+        # filter diff expressed genes P0.005_C1
+        DIFF_EXP_RESULTS + "/_done_P0.005_C1"
+
+rule extract_diff_expressed:
+    input:
+        count_matrix = DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
+        agg_quant = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix",
+        samples_list = ROOT_DIR + "samples.tsv",
+
+    
+    params:
+        p_val = 0.005,
+        log_fold_change = 1,
+        deseq_dir = DIFF_EXP_RESULTS,
+
+    output:
+        DIFF_EXP_RESULTS + "/_done_P0.005_C1"
+
+    shell: """
+        OUT_DIR={params.deseq_dir}/FILTERED_P{params.p_val}-C{params.log_fold_change} && \
+        mkdir -p $OUT_DIR && \
+        cd {params.deseq_dir} && \
+        TRINITY_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/trinity-*/opt/trinity-* | tail -n 1) && \
+        $TRINITY_HOME/Analysis/DifferentialExpression/analyze_diff_expr.pl \
+        --matrix {input.agg_quant} \
+        --samples {input.samples_list} \
+        -P {params.p_val} -C {params.log_fold_change} && \
+        mv *P{params.p_val}_C{params.log_fold_change}* $OUT_DIR && \
+        touch _done_P{params.p_val}_C{params.log_fold_change}
+    """
 
 
 rule deseq2:
