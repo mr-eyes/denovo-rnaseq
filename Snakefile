@@ -21,18 +21,8 @@ SAMPLES_DIR = ROOT_DIR + "samples"
 TRIMMED_SAMPLES = ROOT_DIR + "trimmed"
 ASSEMBLY_DIR = ROOT_DIR + "assembly"
 SALMON_QUANT = ROOT_DIR + "salmon_quant"
-
-
-SIGS_OUTDIR = ROOT_DIR + "sigs"
-cDBG_OUTDIR = ROOT_DIR + "cDBGk75_samples"
-cDBG_ASSEMBLY_DIR = ROOT_DIR + "assembled_cDBGk75_samples"
-TRIMMED_ASSEMBLY_DIR = ROOT_DIR + "assembled_trimmed_samples"
-ITS_DB_DIR = ROOT_DIR + "its_db"
-SPLITTED_FASTA_DIR = ROOT_DIR + "splitted_fasta"
-BLASTN_RESULTS_DIR = ROOT_DIR + "blastn_results"
-SEQCLEAN_TRIMMED_ASSEMBLY_DIR = ROOT_DIR + "seqclean_assembled_trimmed_samples"
-BUSCO_DATASET_DIR = ROOT_DIR + "BUSCO_DATASET"
-BUSCO_REPORTS = ROOT_DIR + "BUSCO_REPORTS"
+DESEQ2_OUT_DIR = ROOT_DIR + "DESEQ2"
+DIFF_EXP_RESULTS = DESEQ2_OUT_DIR + "/complete"
 
 
 SAMPLES, = glob_wildcards(SAMPLES_DIR + "/{sample}_1.fastq.gz")
@@ -54,34 +44,36 @@ rule all:
         # aggregated quantification
         SALMON_QUANT + "/agg_quant/" + "aggr_quant.isoform.TMM.EXPR.matrix",
 
+        # diff exp
+        DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix"
 
-        # # Generate cDBG for all trimmed samples {R1_PE, R2_PE, Merged}
-        # expand("{OUTDIR}" + "/cDBG_k75_all_samples.{EXT}", OUTDIR = cDBG_OUTDIR, EXT = ["histo", "unitigs.fa"]),
-        # # Merge all signatures
-        # SIGS_OUTDIR + "/all_samples_k31.sig",
-        # # Assemble the cDBG of all trimmed samples
-        # cDBG_ASSEMBLY_DIR + "/transcripts.fasta",
-        # TRIMMED_ASSEMBLY_DIR + "/transcripts.fasta",
-        # # Download and create blastdb of the ITS database
-        # # expand(ITS_DB_DIR + "/its_8.3.{EXT}", EXT = ['nhr', 'nin', 'nsq']),
-        # ITS_DB_DIR + "/its_8.3.fa.ndb",
-        # # cDBG blastn query on ITS
-        # BLASTN_RESULTS_DIR + "/its_cDBG_all_samples.blastn",
-        # # BLASTN_RESULTS_DIR + "/its_assembled_trimmed_samples.blastn",
-        # # seqclean of assembled trimmed samples output
-        # TRIMMED_ASSEMBLY_DIR + "/cleaned_transcripts.fasta",
 
-        # BUSCO_REPORTS + "/CLEANED_TRANSCRIPT_TRIMMED/short_summary.specific.eukaryota_odb10.CLEANED_TRANSCRIPT_TRIMMED.txt",
 
-        # # BLASTn assembled trimmed samples
-        # # expand(BLASTN_RESULTS_DIR + "/cleaned_assembled_trimmed" + "/its_cleaned_assembled_trimmed_samples{SPLIT_PART}.blastn", SPLIT_PART = ["%03d" % (num,) for num in range(1,33,1)])
-        # BLASTN_RESULTS_DIR + "/cleaned_assembled_trimmed" + "/merged_its_cleaned_assembled_trimmed_samples.blastn",
-        # TRIMMED_ASSEMBLY_DIR + "/busco_config.ini"
+rule deseq2:
+    input: 
+        agg_quant = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix",
+        samples_list = ROOT_DIR + "samples.tsv",
+    
+    output:
+        count_matrix = DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix"
+
+    params:
+        deseq2_out_dir = DIFF_EXP_RESULTS,
+
+    shell: """
+    sed -i 's/_quant//g' {input.agg_quant} && \
+    mkdir -p {params.deseq2_out_dir} && \
+    TRINITY_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/trinity-*/opt/trinity-* | tail -n 1) && \
+    $TRINITY_HOME/Analysis/DifferentialExpression/run_DE_analysis.pl \
+        --matrix {input.agg_quant} \
+        --samples_file {input.samples_list} \
+        --method DESeq2 \
+        --output {params.deseq2_out_dir}
+    """
 
 rule aggregate_quants:
     input: 
         _salmon_quant = expand(SALMON_QUANT + "/{sample}_quant/quant.sf", sample = SAMPLES),
-        samples_list = ROOT_DIR + "samples.tsv",
     
     output:
         agg_file = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix"
