@@ -34,6 +34,16 @@ conda activate rnaseq
 5. Copy paste the tab-delimited file [samples.tsv](workflow/samples.tsv) in your workflow directory.
 6. Modify the `samples.tsv` to match your samples. Columns as following (sample_type, sample_name, R1_path, R2_path).
 
+---
+
+You may use the following bash commands to update the `Snakefile` and `samples.tsv` files.
+```bash
+curr=$(pwd)/workflow/
+sed -i "s/REPLACE_ABSOLUTE_PATH/${curr//\//\\/}/g" workflow/samples.tsv
+sed -i "s/REPLACE_ROOT_DIR/${curr//\//\\/}/g" Snakefile
+```
+
+
 ## Workflow rulegraph
 
 ![](rulegraph.png?raw=true)

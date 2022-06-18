@@ -11,7 +11,7 @@ def prepare_rnaSpades(param, reads):
         all_params.append(f"{param} {read}")
     return ' '.join(all_params)
 
-ROOT_DIR = "/home/mabuelanin/tmp/denovo-rnaseq/workflow/"
+ROOT_DIR = "REPLACE_ROOT_DIR"
 
 SAMPLES_DIR = ROOT_DIR + "samples"
 TRIMMED_SAMPLES = ROOT_DIR + "trimmed"
