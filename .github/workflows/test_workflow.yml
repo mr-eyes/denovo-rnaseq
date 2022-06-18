@@ -51,7 +51,7 @@ jobs:
 
       - name: modify samples.tsv
         run: |
-          curr=$(pwd)/workflow
+          curr=$(pwd)/workflow/
           sed -i "s/REPLACE_ABSOLUTE_PATH/${curr//\//\\/}/g" workflow/samples.tsv
           sed -i "s/REPLACE_ROOT_DIR/${curr//\//\\/}/g" Snakefile
 
