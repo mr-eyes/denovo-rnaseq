@@ -11,7 +11,7 @@ def prepare_rnaSpades(param, reads):
         all_params.append(f"{param} {read}")
     return ' '.join(all_params)
 
-ROOT_DIR = "REPLACE_ROOT_DIR"
+ROOT_DIR = "/home/mabuelanin/tmp/denovo-rnaseq/workflow/"
 
 SAMPLES_DIR = ROOT_DIR + "samples"
 TRIMMED_SAMPLES = ROOT_DIR + "trimmed"
@@ -296,7 +296,7 @@ rule detect_orf:
         mkdir -p {params.transdecoder_dir} && \
         cd {params.transdecoder_dir} && \
         TransDecoder.LongOrfs -t {input.expressed_transcripts} && \
-        TransDecoder.Predict -t {input.expressed_transcripts}
+        TransDecoder.Predict -t {input.expressed_transcripts}  --no_refine_starts
     """
 
 
