@@ -11,7 +11,7 @@ def prepare_rnaSpades(param, reads):
         all_params.append(f"{param} {read}")
     return ' '.join(all_params)
 
-ROOT_DIR = "/home/mabuelanin/dib-dev/denovo-rnaseq/workflow/"
+ROOT_DIR = "/home/mhussien/hend/denovo-rnaseq/workflow/"
 
 SAMPLES_DIR = ROOT_DIR + "samples"
 TRIMMED_SAMPLES = ROOT_DIR + "trimmed"
@@ -47,7 +47,6 @@ rule all:
         DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
 
         # filter diff expressed genes P0.005_C1
-        DESEQ2_OUT_DIR + "/_done_P0.005_C1",
 
         # Extract expressed transcripts
         DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
@@ -115,6 +114,7 @@ rule identify_protein_domains:
 
     output:
         pfam_log = TRINOTATE_OUT_DIR + "/pfam.log",
+        trinotate_pfam = TRINOTATE_OUT_DIR + "/TrinotatePFAM.out",
     
     params:
         out_dir = TRINOTATE_OUT_DIR
@@ -304,7 +304,6 @@ rule extract_expressed_genes:
     threads: 1
     input:
         assembled_transcripts = ASSEMBLY_DIR + "/transcripts.fasta",
-        _deseq2_filtered = DESEQ2_OUT_DIR + "/_done_P0.005_C1", # just to make sure filteration is complete
         filtered_subset = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.DE_results.P0.005_C1.DE.subset",
     
     output:
@@ -337,7 +336,7 @@ rule extract_diff_expressed:
         deseq_dir = DESEQ2_OUT_DIR,
 
     output:
-        DESEQ2_OUT_DIR + "/_done_P0.005_C1"
+        filtered_subset = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.DE_results.P0.005_C1.DE.subset",
     
     resources:
         mem_mb = 10 * 1024,
@@ -354,8 +353,7 @@ rule extract_diff_expressed:
         --matrix {input.agg_quant} \
         --samples {input.samples_list} \
         -P {params.p_val} -C {params.log_fold_change} && \
-        mv *P{params.p_val}_C{params.log_fold_change}* $OUT_DIR && \
-        touch _done_P{params.p_val}_C{params.log_fold_change}
+        mv *P{params.p_val}_C{params.log_fold_change}* $OUT_DIR
     """
 
 
