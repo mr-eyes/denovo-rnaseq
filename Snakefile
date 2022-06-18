@@ -69,7 +69,8 @@ rule all:
 
 
 
-rule main_trinotate:
+rule trinotate_report:
+    threads: 1
     input:
         transdecoder_predicted = TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
         expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
@@ -87,6 +88,12 @@ rule main_trinotate:
         trinotate_app = TRINOTATE_DIR + "/app_3.2.2/Trinotate",
         out_dir = TRINOTATE_OUT_DIR,
 
+    resources:
+        mem_mb = 25 * 1024,
+        nodes = 1,
+        time = 60 * 5,
+        partition = "med2"
+
     shell: """
         set -e && \
         cat {input.expressed_transcripts} | grep ">" | cut -c2- |  awk -F_ '{{print $1 (NF>1? FS $2 : "")"\t"$0}}' > {output.gene_to_transcript_map} && \
@@ -99,6 +106,7 @@ rule main_trinotate:
 
 
 rule identify_protein_domains:
+    threads: 1
     input:
         blastp = TRINOTATE_OUT_DIR + "/blastp.outfmt6",
         blastx = TRINOTATE_OUT_DIR + "/blastx.outfmt6",
@@ -111,6 +119,12 @@ rule identify_protein_domains:
     params:
         out_dir = TRINOTATE_OUT_DIR
     
+    resources:
+        mem_mb = 25 * 1024,
+        nodes = 1,
+        time = 60 * 5,
+        partition = "med2"
+
     shell: """
         cd {params.out_dir} && \
         hmmscan --cpu 12 \
@@ -120,6 +134,7 @@ rule identify_protein_domains:
     """
 
 rule align_predicted_transdecoder:
+    threads: 8
     input:
         _blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
         transdecoder_predicted = TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
@@ -131,6 +146,12 @@ rule align_predicted_transdecoder:
     output:
         blastp = TRINOTATE_OUT_DIR + "/blastp.outfmt6",
 
+    resources:
+        mem_mb = 25 * 1024,
+        nodes = 1,
+        time = 60 * 5,
+        partition = "med2"
+
     shell: """
        blastp -query {input.transdecoder_predicted} \
        -db {params.blast_db} \
@@ -141,6 +162,7 @@ rule align_predicted_transdecoder:
     """
 
 rule align_expressed_genes:
+    threads: 8
     input:
         _blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
         expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
@@ -150,6 +172,12 @@ rule align_expressed_genes:
 
     output:
         blastx = TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+
+    resources:
+        mem_mb = 25 * 1024,
+        nodes = 1,
+        time = 60 * 5,
+        partition = "med2"
 
     shell: """
         blastx -query {input.expressed_transcripts} \
@@ -163,6 +191,7 @@ rule align_expressed_genes:
 
 
 rule trinotate_prepare_blast:
+    threads: 1
     input:
         uniprot = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep",
     
@@ -172,12 +201,19 @@ rule trinotate_prepare_blast:
     output:
         TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb"
     
+    resources:
+        mem_mb = 20 * 1024,
+        nodes = 1,
+        time = 60 * 2,
+        partition = "med2"
+    
     shell: """
         makeblastdb -in {input.uniprot} -dbtype prot
     """
 
 
-rule trinotate_download:
+rule trinotate_prepare_DBs:
+    threads: 1
     input:
         TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
         TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
@@ -190,7 +226,13 @@ rule trinotate_download:
         trinotate_dir = TRINOTATE_DIR,
         trinotate_data = TRINOTATE_DATA_DIR,
         trinotate_app = TRINOTATE_DIR + "/app_3.2.2"
-    
+
+    resources:
+        mem_mb = 32 * 1024,
+        nodes = 1,
+        time = 5 * 60,
+        partition = "med2"
+
     shell: """
         mkdir -p {params.trinotate_data} && \
         cd {params.trinotate_data} && \
@@ -201,6 +243,7 @@ rule trinotate_download:
     """
 
 rule download_trinotate:
+    threads: 1
     input:
         TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
     
@@ -210,6 +253,12 @@ rule download_trinotate:
     params:
         trinotate_dir = TRINOTATE_DIR,
         trinotate_app = TRINOTATE_DIR + "/app_3.2.2"
+    
+    resources:
+        mem_mb = 5 * 1024,
+        nodes = 1,
+        time = 5  * 60,
+        partition = "med2"
 
 
     shell: """
@@ -225,6 +274,7 @@ rule download_trinotate:
     """
 
 rule detect_orf:
+    threads: 1
     input:
         expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
 
@@ -234,6 +284,12 @@ rule detect_orf:
     output:
         TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder_dir/longest_orfs.pep",
         TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep"
+
+    resources:
+        mem_mb = 10 * 1024,
+        nodes = 1,
+        time = 2 * 60,
+        partition = "med2"
 
     shell: """
         mkdir -p {params.transdecoder_dir} && \
@@ -245,6 +301,7 @@ rule detect_orf:
 
 
 rule extract_expressed_genes:
+    threads: 1
     input:
         assembled_transcripts = ASSEMBLY_DIR + "/transcripts.fasta",
         _deseq2_filtered = DESEQ2_OUT_DIR + "/_done_P0.005_C1", # just to make sure filteration is complete
@@ -252,6 +309,12 @@ rule extract_expressed_genes:
     
     output:
         out_fasta = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+    
+    resources:
+        mem_mb = 1 * 1024,
+        nodes = 1,
+        time = 10,
+        partition = "med2"
 
     shell: """
         seqkit grep -f \
@@ -262,6 +325,7 @@ rule extract_expressed_genes:
 
 
 rule extract_diff_expressed:
+    threads: 1
     input:
         count_matrix = DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
         agg_quant = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix",
@@ -274,6 +338,12 @@ rule extract_diff_expressed:
 
     output:
         DESEQ2_OUT_DIR + "/_done_P0.005_C1"
+    
+    resources:
+        mem_mb = 10 * 1024,
+        nodes = 1,
+        time = 60,
+        partition = "med2"
 
     shell: """
         OUT_DIR={params.deseq_dir}/FILTERED_P{params.p_val}-C{params.log_fold_change} && \
@@ -290,6 +360,7 @@ rule extract_diff_expressed:
 
 
 rule deseq2:
+    threads: 1
     input: 
         agg_quant = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix",
         samples_list = ROOT_DIR + "samples.tsv",
@@ -299,6 +370,12 @@ rule deseq2:
 
     params:
         deseq2_out_dir = DESEQ2_OUT_DIR,
+    
+    resources:
+        mem_mb = 10 * 1024,
+        nodes = 1,
+        time = 60,
+        partition = "med2"
 
     shell: """
     sed -i 's/_quant//g' {input.agg_quant} && \
@@ -312,6 +389,8 @@ rule deseq2:
     """
 
 rule aggregate_quants:
+    threads: 1
+    
     input: 
         _salmon_quant = expand(SALMON_QUANT + "/{sample}_quant/quant.sf", sample = SAMPLES),
     
@@ -322,6 +401,12 @@ rule aggregate_quants:
         agg_quant_dir = SALMON_QUANT + "/agg_quant",
         quant_list = SALMON_QUANT + "/agg_quant" + "/quant_files.list",
         out_prefix = SALMON_QUANT + "/agg_quant/aggr_quant",
+    
+    resources:
+        mem_mb = 3 * 1024,
+        nodes = 1,
+        time = 60,
+        partition = "med2"
 
     shell: """
         mkdir -p {params.agg_quant_dir} && \
@@ -335,7 +420,8 @@ rule aggregate_quants:
     """
 
 rule quantification:
-    threads: 16
+    threads: 1
+
     input:
         _salmon_index = SALMON_QUANT + "/transcripts.index/info.json",
         r1_pe = SAMPLES_DIR + "/{sample}_1.fastq.gz",
@@ -348,17 +434,30 @@ rule quantification:
         salmon_index = SALMON_QUANT + "/transcripts.index",
         salmon_quant_dir = SALMON_QUANT,
     
+    resources:
+        mem_mb = 10 * 1024,
+        nodes = 1,
+        time = 60,
+        partition = "med2"
+    
     shell: """
         salmon quant -i {params.salmon_index} -p 2 -l IU -1 <(gunzip -c {input.r1_pe}) -2 <(gunzip -c {input.r2_pe}) -o {params.salmon_quant_dir}/{wildcards.sample}_quant
     """
 
 rule salmon_index:
+    threads: 1
     input: 
         transcripts = ASSEMBLY_DIR + "/transcripts.fasta",
 
     output: SALMON_QUANT + "/transcripts.index/info.json"
     params:
         salmon_dir = SALMON_QUANT + "/transcripts.index"
+    
+    resources:
+        mem_mb = 10 * 1024,
+        nodes = 1,
+        time = 60,
+        partition = "med2"
 
     shell: """
         mkdir -p {params.salmon_dir} && \
@@ -379,16 +478,16 @@ rule denovo_assembly:
         transcripts = ASSEMBLY_DIR + "/transcripts.fasta",    
     params:
         spades_output_dir = ASSEMBLY_DIR,
-        cores = 16,
+        cores = 32,
         rnaspades_tmp_dir = ASSEMBLY_DIR + "/tmp",
         prepared_R1_PE = prepare_rnaSpades("-1", expand(TRIMMED_SAMPLES + "/trimmed_{sample}_R1_PE.fastq.gz", sample = SAMPLES)),
         prepared_R2_PE = prepare_rnaSpades("-2", expand(TRIMMED_SAMPLES + "/trimmed_{sample}_R2_PE.fastq.gz", sample = SAMPLES)),
         prepared_MERGED = prepare_rnaSpades("--merged", expand(TRIMMED_SAMPLES + "/trimmed_{sample}_merged.fastq.gz", sample = SAMPLES)),
     
     resources:
-        mem_mb = 32000,
+        mem_mb = 100 * 1024,
         nodes = 1,
-        time = 2000,
+        time = 60 * 10,
         partition = "med2"
     
     shell: """
