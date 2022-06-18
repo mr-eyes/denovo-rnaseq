@@ -28,43 +28,45 @@ SAMPLES, = glob_wildcards(SAMPLES_DIR + "/{sample}_1.fastq.gz")
 
 rule all:
     input:
-        # fastp trimming, this can be turned off in favor of previous or next rules
-        expand("{OUTDIR}" + "/trimmed_{sample}_{file_type}.fastq.gz", OUTDIR = TRIMMED_SAMPLES, sample=SAMPLES, file_type = ["R1_PE", "R2_PE", "merged"]),
-        
-        # denovo assembly
-        ASSEMBLY_DIR + "/transcripts.fasta",
-
-        # salmon index
-        SALMON_QUANT + "/transcripts.index/info.json",
-
-        # salmon quantification
-        expand(SALMON_QUANT + "/{sample}_quant/quant.sf", sample = SAMPLES),
-
-        # aggregated quantification
-        SALMON_QUANT + "/agg_quant/" + "aggr_quant.isoform.TMM.EXPR.matrix",
-
-        # diff exp
-        DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
-
-        # filter diff expressed genes P0.005_C1
-
-        # Extract expressed transcripts
-        DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
-
-        # Transdecoder
-        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder_dir/longest_orfs.pep",
-        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
-
-        # Trinotate Data
-        TRINOTATE_DATA_DIR + "/Pfam-A.hmm",
-        TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
-        TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
-        TRINOTATE_OUT_DIR + "/blastp.outfmt6",
-        TRINOTATE_OUT_DIR + "/blastx.outfmt6",
-        TRINOTATE_OUT_DIR + "/pfam.log",
-
-        TRINOTATE_OUT_DIR + "/gene_to_transcript.tsv",
         TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
+
+        # # fastp trimming, this can be turned off in favor of previous or next rules
+        # expand("{OUTDIR}" + "/trimmed_{sample}_{file_type}.fastq.gz", OUTDIR = TRIMMED_SAMPLES, sample=SAMPLES, file_type = ["R1_PE", "R2_PE", "merged"]),
+        
+        # # denovo assembly
+        # ASSEMBLY_DIR + "/transcripts.fasta",
+
+        # # salmon index
+        # SALMON_QUANT + "/transcripts.index/info.json",
+
+        # # salmon quantification
+        # expand(SALMON_QUANT + "/{sample}_quant/quant.sf", sample = SAMPLES),
+
+        # # aggregated quantification
+        # SALMON_QUANT + "/agg_quant/" + "aggr_quant.isoform.TMM.EXPR.matrix",
+
+        # # diff exp
+        # DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
+
+        # # filter diff expressed genes P0.005_C1
+
+        # # Extract expressed transcripts
+        # DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+
+        # # Transdecoder
+        # TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder_dir/longest_orfs.pep",
+        # TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+
+        # # Trinotate Data
+        # TRINOTATE_DATA_DIR + "/Pfam-A.hmm",
+        # TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
+        # TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
+        # TRINOTATE_OUT_DIR + "/blastp.outfmt6",
+        # TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+        # TRINOTATE_OUT_DIR + "/pfam.log",
+
+        # TRINOTATE_OUT_DIR + "/gene_to_transcript.tsv",
+        # TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
 
 
 
@@ -91,7 +93,7 @@ rule trinotate_report:
         mem_mb = 25 * 1024,
         nodes = 1,
         time = 60 * 5,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         set -e && \
@@ -123,7 +125,7 @@ rule identify_protein_domains:
         mem_mb = 25 * 1024,
         nodes = 1,
         time = 60 * 5,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         cd {params.out_dir} && \
@@ -150,7 +152,7 @@ rule align_predicted_transdecoder:
         mem_mb = 25 * 1024,
         nodes = 1,
         time = 60 * 5,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
        blastp -query {input.transdecoder_predicted} \
@@ -177,7 +179,7 @@ rule align_expressed_genes:
         mem_mb = 25 * 1024,
         nodes = 1,
         time = 60 * 5,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         blastx -query {input.expressed_transcripts} \
@@ -205,7 +207,7 @@ rule trinotate_prepare_blast:
         mem_mb = 20 * 1024,
         nodes = 1,
         time = 60 * 2,
-        partition = "med2"
+        partition = "high2"
     
     shell: """
         makeblastdb -in {input.uniprot} -dbtype prot
@@ -231,7 +233,7 @@ rule trinotate_prepare_DBs:
         mem_mb = 32 * 1024,
         nodes = 1,
         time = 5 * 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         mkdir -p {params.trinotate_data} && \
@@ -258,7 +260,7 @@ rule download_trinotate:
         mem_mb = 5 * 1024,
         nodes = 1,
         time = 5  * 60,
-        partition = "med2"
+        partition = "high2"
 
 
     shell: """
@@ -289,12 +291,12 @@ rule detect_orf:
         mem_mb = 10 * 1024,
         nodes = 1,
         time = 2 * 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         mkdir -p {params.transdecoder_dir} && \
         cd {params.transdecoder_dir} && \
-        TRANSDECODER_HOME=$CONDA_PREFIX/../../pkgs/transdecoder*/opt/transdecoder/ && \
+        TRANSDECODER_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/transdecoder-*/opt/transdecoder | tail -n 1) && \
         $TRANSDECODER_HOME/TransDecoder.LongOrfs -t {input.expressed_transcripts} && \
         $TRANSDECODER_HOME/TransDecoder.Predict -t {input.expressed_transcripts}
     """
@@ -313,7 +315,7 @@ rule extract_expressed_genes:
         mem_mb = 1 * 1024,
         nodes = 1,
         time = 10,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         seqkit grep -f \
@@ -342,7 +344,7 @@ rule extract_diff_expressed:
         mem_mb = 10 * 1024,
         nodes = 1,
         time = 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         OUT_DIR={params.deseq_dir}/FILTERED_P{params.p_val}-C{params.log_fold_change} && \
@@ -373,7 +375,7 @@ rule deseq2:
         mem_mb = 10 * 1024,
         nodes = 1,
         time = 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
     sed -i 's/_quant//g' {input.agg_quant} && \
@@ -404,7 +406,7 @@ rule aggregate_quants:
         mem_mb = 3 * 1024,
         nodes = 1,
         time = 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         mkdir -p {params.agg_quant_dir} && \
@@ -436,7 +438,7 @@ rule quantification:
         mem_mb = 10 * 1024,
         nodes = 1,
         time = 60,
-        partition = "med2"
+        partition = "high2"
     
     shell: """
         salmon quant -i {params.salmon_index} -p 2 -l IU -1 <(gunzip -c {input.r1_pe}) -2 <(gunzip -c {input.r2_pe}) -o {params.salmon_quant_dir}/{wildcards.sample}_quant
@@ -455,7 +457,7 @@ rule salmon_index:
         mem_mb = 10 * 1024,
         nodes = 1,
         time = 60,
-        partition = "med2"
+        partition = "high2"
 
     shell: """
         mkdir -p {params.salmon_dir} && \
@@ -486,7 +488,7 @@ rule denovo_assembly:
         mem_mb = 100 * 1024,
         nodes = 1,
         time = 60 * 10,
-        partition = "med2"
+        partition = "high2"
     
     shell: """
         /usr/bin/time -v \
