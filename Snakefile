@@ -238,7 +238,6 @@ rule trinotate_prepare_DBs:
     shell: """
         mkdir -p {params.trinotate_data} && \
         cd {params.trinotate_data} && \
-        TRINOTATE_HOME=$CONDA_PREFIX/../../pkgs/trinotate*/bin/ && \
         {params.trinotate_app}/admin/Build_Trinotate_Boilerplate_SQLite_db.pl  Trinotate && \
         gunzip Pfam-A.hmm.gz && \
         hmmpress Pfam-A.hmm
@@ -296,9 +295,8 @@ rule detect_orf:
     shell: """
         mkdir -p {params.transdecoder_dir} && \
         cd {params.transdecoder_dir} && \
-        TRANSDECODER_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/transdecoder-*/opt/transdecoder | tail -n 1) && \
-        $TRANSDECODER_HOME/TransDecoder.LongOrfs -t {input.expressed_transcripts} && \
-        $TRANSDECODER_HOME/TransDecoder.Predict -t {input.expressed_transcripts}
+        TransDecoder.LongOrfs -t {input.expressed_transcripts} && \
+        TransDecoder.Predict -t {input.expressed_transcripts}
     """
 
 
@@ -350,7 +348,7 @@ rule extract_diff_expressed:
         OUT_DIR={params.deseq_dir}/FILTERED_P{params.p_val}-C{params.log_fold_change} && \
         mkdir -p $OUT_DIR && \
         cd {params.deseq_dir} && \
-        TRINITY_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/trinity-*/opt/trinity-* | tail -n 1) && \
+        TRINITY_HOME=$(dirname $(realpath `which Trinity`)) && \
         $TRINITY_HOME/Analysis/DifferentialExpression/analyze_diff_expr.pl \
         --matrix {input.agg_quant} \
         --samples {input.samples_list} \
@@ -380,7 +378,7 @@ rule deseq2:
     shell: """
     sed -i 's/_quant//g' {input.agg_quant} && \
     mkdir -p {params.deseq2_out_dir} && \
-    TRINITY_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/trinity-*/opt/trinity-* | tail -n 1) && \
+    TRINITY_HOME=$(dirname $(realpath `which Trinity`)) && \
     $TRINITY_HOME/Analysis/DifferentialExpression/run_DE_analysis.pl \
         --matrix {input.agg_quant} \
         --samples_file {input.samples_list} \
@@ -410,7 +408,7 @@ rule aggregate_quants:
 
     shell: """
         mkdir -p {params.agg_quant_dir} && \
-        TRINITY_HOME=$(ls -d -1 -tra $CONDA_PREFIX/../../pkgs/trinity-*/opt/trinity-* | tail -n 1) && \
+        TRINITY_HOME=$(dirname $(realpath `which Trinity`)) && \
         find $(pwd)/workflow/*_quant -name "quant.sf" | tee {params.quant_list} && \
         $TRINITY_HOME/util/abundance_estimates_to_matrix.pl --est_method salmon \
         --out_prefix {params.out_prefix} \
