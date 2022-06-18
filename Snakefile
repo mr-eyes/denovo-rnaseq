@@ -5,14 +5,10 @@ import sys
 
 
 def prepare_rnaSpades(param, reads):
-    # print(f"original: {reads}", file=sys.stderr)
-    # print(f"str: {str(reads)}", file=sys.stderr)
     reads = list(reads)
-    # print(f"list: {reads}", file=sys.stderr)
     all_params = list()
     for read in reads:
         all_params.append(f"{param} {read}")
-    # print(' '.join(all_params), file=sys.stderr)
     return ' '.join(all_params)
 
 ROOT_DIR = "/home/mabuelanin/dib-dev/denovo-rnaseq/workflow/"
@@ -21,8 +17,11 @@ SAMPLES_DIR = ROOT_DIR + "samples"
 TRIMMED_SAMPLES = ROOT_DIR + "trimmed"
 ASSEMBLY_DIR = ROOT_DIR + "assembly"
 SALMON_QUANT = ROOT_DIR + "salmon_quant"
-DESEQ2_OUT_DIR = ROOT_DIR + "DESEQ2"
-DIFF_EXP_RESULTS = DESEQ2_OUT_DIR + "/complete"
+DESEQ2_OUT_DIR = ROOT_DIR + "DESEQ2" 
+TRANSDECODER_DIR = ROOT_DIR + "transdecoder"
+TRINOTATE_DIR = ROOT_DIR + "trinotate"
+TRINOTATE_DATA_DIR = ROOT_DIR + "trinotate/data"
+TRINOTATE_OUT_DIR = ROOT_DIR + "trinotate/out_dir"
 
 
 SAMPLES, = glob_wildcards(SAMPLES_DIR + "/{sample}_1.fastq.gz")
@@ -45,25 +44,236 @@ rule all:
         SALMON_QUANT + "/agg_quant/" + "aggr_quant.isoform.TMM.EXPR.matrix",
 
         # diff exp
-        DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
+        DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
 
         # filter diff expressed genes P0.005_C1
-        DIFF_EXP_RESULTS + "/_done_P0.005_C1"
+        DESEQ2_OUT_DIR + "/_done_P0.005_C1",
+
+        # Extract expressed transcripts
+        DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+
+        # Transdecoder
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder_dir/longest_orfs.pep",
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+
+        # Trinotate Data
+        TRINOTATE_DATA_DIR + "/Pfam-A.hmm",
+        TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
+        TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
+        TRINOTATE_OUT_DIR + "/blastp.outfmt6",
+        TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+        TRINOTATE_OUT_DIR + "/pfam.log",
+
+        TRINOTATE_OUT_DIR + "/gene_to_transcript.tsv",
+        TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
+
+
+
+rule main_trinotate:
+    input:
+        transdecoder_predicted = TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+        expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+        sqlite = TRINOTATE_DATA_DIR + "/Trinotate.sqlite",
+        blastp = TRINOTATE_OUT_DIR + "/blastp.outfmt6",
+        blastx = TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+        trinotate_pfam = TRINOTATE_OUT_DIR + "/TrinotatePFAM.out",
+
+
+    output:
+        gene_to_transcript_map = TRINOTATE_OUT_DIR + "/gene_to_transcript.tsv",
+        trinotate_report = TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
+
+    params:
+        trinotate_app = TRINOTATE_DIR + "/app_3.2.2/Trinotate",
+        out_dir = TRINOTATE_OUT_DIR,
+
+    shell: """
+        set -e && \
+        cat {input.expressed_transcripts} | grep ">" | cut -c2- |  awk -F_ '{{print $1 (NF>1? FS $2 : "")"\t"$0}}' > {output.gene_to_transcript_map} && \
+        {params.trinotate_app} {input.sqlite} init --gene_trans_map {output.gene_to_transcript_map} --transcript_fasta {input.expressed_transcripts} --transdecoder_pep {input.transdecoder_predicted} && \
+        {params.trinotate_app} {input.sqlite} LOAD_swissprot_blastp {input.blastp} && \
+        {params.trinotate_app} {input.sqlite} LOAD_swissprot_blastx {input.blastx} && \
+        {params.trinotate_app} {input.sqlite} LOAD_pfam {input.trinotate_pfam} && \
+        {params.trinotate_app} {input.sqlite} report [opts] > {output.trinotate_report}
+    """
+
+
+rule identify_protein_domains:
+    input:
+        blastp = TRINOTATE_OUT_DIR + "/blastp.outfmt6",
+        blastx = TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+        transdecoder_predicted = TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+        pfam_A = TRINOTATE_DATA_DIR + "/Pfam-A.hmm"
+
+    output:
+        pfam_log = TRINOTATE_OUT_DIR + "/pfam.log",
+    
+    params:
+        out_dir = TRINOTATE_OUT_DIR
+    
+    shell: """
+        cd {params.out_dir} && \
+        hmmscan --cpu 12 \
+        --domtblout TrinotatePFAM.out \
+        {input.pfam_A} \
+        {input.transdecoder_predicted} > {output.pfam_log}
+    """
+
+rule align_predicted_transdecoder:
+    input:
+        _blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
+        transdecoder_predicted = TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+        
+    
+    params:
+        blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep"
+
+    output:
+        blastp = TRINOTATE_OUT_DIR + "/blastp.outfmt6",
+
+    shell: """
+       blastp -query {input.transdecoder_predicted} \
+       -db {params.blast_db} \
+       -num_threads 8 \
+       -max_target_seqs 1 \
+       -outfmt 6 \
+       -evalue 1e-3 > {output.blastp}
+    """
+
+rule align_expressed_genes:
+    input:
+        _blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb",
+        expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+    
+    params:
+        blast_db = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep"
+
+    output:
+        blastx = TRINOTATE_OUT_DIR + "/blastx.outfmt6",
+
+    shell: """
+        blastx -query {input.expressed_transcripts} \
+        -db {params.blast_db} \
+        -num_threads 8 \
+        -max_target_seqs 1 \
+        -outfmt 6 \
+        -evalue 1e-3 > {output.blastx}
+    """
+        
+
+
+rule trinotate_prepare_blast:
+    input:
+        uniprot = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep",
+    
+    params:
+        trinotate_data = TRINOTATE_DATA_DIR,
+
+    output:
+        TRINOTATE_DATA_DIR + "/uniprot_sprot.pep.pdb"
+    
+    shell: """
+        makeblastdb -in {input.uniprot} -dbtype prot
+    """
+
+
+rule trinotate_download:
+    input:
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+        TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
+    output:
+        sqlite = TRINOTATE_DATA_DIR + "/Trinotate.sqlite",
+        uniprot = TRINOTATE_DATA_DIR + "/uniprot_sprot.pep",
+        pfam = TRINOTATE_DATA_DIR + "/Pfam-A.hmm",
+    
+    params:
+        trinotate_dir = TRINOTATE_DIR,
+        trinotate_data = TRINOTATE_DATA_DIR,
+        trinotate_app = TRINOTATE_DIR + "/app_3.2.2"
+    
+    shell: """
+        mkdir -p {params.trinotate_data} && \
+        cd {params.trinotate_data} && \
+        TRINOTATE_HOME=$CONDA_PREFIX/../../pkgs/trinotate*/bin/ && \
+        {params.trinotate_app}/admin/Build_Trinotate_Boilerplate_SQLite_db.pl  Trinotate && \
+        gunzip Pfam-A.hmm.gz && \
+        hmmpress Pfam-A.hmm
+    """
+
+rule download_trinotate:
+    input:
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep",
+    
+    output:
+        TRINOTATE_DIR + "/app_3.2.2/admin/Build_Trinotate_Boilerplate_SQLite_db.pl",
+
+    params:
+        trinotate_dir = TRINOTATE_DIR,
+        trinotate_app = TRINOTATE_DIR + "/app_3.2.2"
+
+
+    shell: """
+    set -e
+        mkdir -p {params.trinotate_dir} && \
+        cd {params.trinotate_dir} && \
+        wget https://github.com/Trinotate/Trinotate/archive/refs/tags/Trinotate-v3.2.2.zip && \
+        unzip Trinotate-v3.2.2.zip && \
+        echo mv Trinotate-Trinotate-v3.2.2 {params.trinotate_app} && \
+        rm -rf {params.trinotate_app}
+        mv Trinotate-Trinotate-v3.2.2 {params.trinotate_app} && \
+        rm -rf tmp Trinotate-v3.2.2.zip
+    """
+
+rule detect_orf:
+    input:
+        expressed_transcripts = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+
+    params:
+        transdecoder_dir = TRANSDECODER_DIR,
+
+    output:
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder_dir/longest_orfs.pep",
+        TRANSDECODER_DIR + "/expressed_transcripts.fasta.transdecoder.pep"
+
+    shell: """
+        mkdir -p {params.transdecoder_dir} && \
+        cd {params.transdecoder_dir} && \
+        TRANSDECODER_HOME=$CONDA_PREFIX/../../pkgs/transdecoder*/opt/transdecoder/ && \
+        $TRANSDECODER_HOME/TransDecoder.LongOrfs -t {input.expressed_transcripts} && \
+        $TRANSDECODER_HOME/TransDecoder.Predict -t {input.expressed_transcripts}
+    """
+
+
+rule extract_expressed_genes:
+    input:
+        assembled_transcripts = ASSEMBLY_DIR + "/transcripts.fasta",
+        _deseq2_filtered = DESEQ2_OUT_DIR + "/_done_P0.005_C1", # just to make sure filteration is complete
+        filtered_subset = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.DE_results.P0.005_C1.DE.subset",
+    
+    output:
+        out_fasta = DESEQ2_OUT_DIR + "/FILTERED_P0.005-C1/expressed_transcripts.fasta",
+
+    shell: """
+        seqkit grep -f \
+        <(cat {input.filtered_subset} | sed '1d' | cut -f1) \
+        {input.assembled_transcripts} -o {output.out_fasta}
+    """
+
+
 
 rule extract_diff_expressed:
     input:
-        count_matrix = DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
+        count_matrix = DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix",
         agg_quant = SALMON_QUANT + "/agg_quant/aggr_quant.isoform.TMM.EXPR.matrix",
         samples_list = ROOT_DIR + "samples.tsv",
 
-    
     params:
         p_val = 0.005,
         log_fold_change = 1,
-        deseq_dir = DIFF_EXP_RESULTS,
+        deseq_dir = DESEQ2_OUT_DIR,
 
     output:
-        DIFF_EXP_RESULTS + "/_done_P0.005_C1"
+        DESEQ2_OUT_DIR + "/_done_P0.005_C1"
 
     shell: """
         OUT_DIR={params.deseq_dir}/FILTERED_P{params.p_val}-C{params.log_fold_change} && \
@@ -85,10 +295,10 @@ rule deseq2:
         samples_list = ROOT_DIR + "samples.tsv",
     
     output:
-        count_matrix = DIFF_EXP_RESULTS + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix"
+        count_matrix = DESEQ2_OUT_DIR + "/aggr_quant.isoform.TMM.EXPR.matrix.control_vs_treated.DESeq2.count_matrix"
 
     params:
-        deseq2_out_dir = DIFF_EXP_RESULTS,
+        deseq2_out_dir = DESEQ2_OUT_DIR,
 
     shell: """
     sed -i 's/_quant//g' {input.agg_quant} && \
