@@ -1,0 +1,30 @@
+name: Workflow Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install mambaforge
+        run: |
+          curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh"
+          bash Mambaforge-Linux-x86_64.sh -b
+          ~/mambaforge/bin/mamba init
+          source ~/.bashrc
+
+      - name: install denovo-rnaseq conda env
+      - run: |
+          mamba env update -n base -f environment.yml
+          mamba activate
+      
+      - name: modify samples.tsv
+      - run: |
+          curr=$(pwd)/workflow
+          sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow\/samples/${curr//\//\\/}/g" workflow/samples.tsv
+          sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow/${curr//\//\\/}/g" Snakefile
+
+      - name: test workflow
+      - run: snakemake -j 4
