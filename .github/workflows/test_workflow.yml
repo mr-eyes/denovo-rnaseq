@@ -11,20 +11,29 @@ on:
 jobs:
   workflow:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu"]
+        include:
+          - os: ubuntu
+            environment-file: environment.yml
+            miniforge-variant: Mambaforge
+            miniforge-version: 4.12.0-2
+
     steps:
       - uses: actions/checkout@v2
 
-      - name: install mambaforge
-        run: |
-          curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Linux-x86_64.sh"
-          bash Mambaforge-Linux-x86_64.sh -b
-          ~/mambaforge/bin/mamba init
-          source ~/.bashrc
-
-      - name: install denovo-rnaseq conda env
-        run: |
-          mamba env update -n base -f environment.yml
-          mamba activate
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          condarc-file: ${{ matrix.condarc-file }}
+          environment-file: ${{ matrix.environment-file }}
+          miniforge-variant: ${{ matrix.miniforge-variant }}
+          miniforge-version: ${{ matrix.miniforge-version }}
+          use-mamba: true
+          auto-activate-base: false
+          activate-environment: rnaseq
 
       - name: modify samples.tsv
         run: |
