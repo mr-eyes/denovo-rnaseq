@@ -52,8 +52,8 @@ jobs:
       - name: modify samples.tsv
         run: |
           curr=$(pwd)/workflow
-          sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow\/samples/${curr//\//\\/}/g" workflow/samples.tsv
-          sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow/${curr//\//\\/}/g" Snakefile
+          sed -i "s/REPLACE_ABSOLUTE_PATH/${curr//\//\\/}/g" workflow/samples.tsv
+          sed -i "s/REPLACE_ROOT_DIR/${curr//\//\\/}/g" Snakefile
 
       - name: test workflow
         run: |
