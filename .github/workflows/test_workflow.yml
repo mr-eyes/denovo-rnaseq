@@ -22,15 +22,15 @@ jobs:
           source ~/.bashrc
 
       - name: install denovo-rnaseq conda env
-      - run: |
+        run: |
           mamba env update -n base -f environment.yml
           mamba activate
 
       - name: modify samples.tsv
-      - run: |
+        run: |
           curr=$(pwd)/workflow
           sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow\/samples/${curr//\//\\/}/g" workflow/samples.tsv
           sed -i "s/\/home\/mabuelanin\/dib-dev\/denovo-rnaseq\/workflow/${curr//\//\\/}/g" Snakefile
 
       - name: test workflow
-      - run: snakemake -j 4
+        run: snakemake -j 4
