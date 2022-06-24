@@ -28,7 +28,7 @@ SAMPLES, = glob_wildcards(SAMPLES_DIR + "/{sample}_1.fastq.gz")
 
 rule all:
     input:
-        TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
+        TRINOTATE_OUT_DIR + "/go_annotations.txt",  
 
         # # fastp trimming, this can be turned off in favor of previous or next rules
         # expand("{OUTDIR}" + "/trimmed_{sample}_{file_type}.fastq.gz", OUTDIR = TRIMMED_SAMPLES, sample=SAMPLES, file_type = ["R1_PE", "R2_PE", "merged"]),
@@ -68,6 +68,24 @@ rule all:
         # TRINOTATE_OUT_DIR + "/gene_to_transcript.tsv",
         # TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
 
+rule go_annotation:
+    threads: 1
+    input:
+        trinotate_report = TRINOTATE_OUT_DIR + "/trinotate_annotation_report.xls",
+    output:
+        go_report = TRINOTATE_OUT_DIR + "/go_annotations.txt",
+    resources:
+        mem_mb = 10 * 1024,
+        partition = "high2",
+        time = 2 * 60,
+    params:
+        trinotate_app = TRINOTATE_DIR + "/app_3.2.2",
+        out_dir = TRINOTATE_OUT_DIR,
+    shell: """
+        {params.trinotate_app}/util/extract_GO_assignments_from_Trinotate_xls.pl \
+        --Trinotate_xls {input.trinotate_report} \
+        -G --include_ancestral_terms > {output.go_report}
+    """
 
 
 rule trinotate_report:
