@@ -1,9 +1,10 @@
-cff-version: 1.1.0
+cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
   - family-names: Abuelanin
     given-names: Mohamed
     orcid: https://orcid.org/0000-0002-3419-4785
-title: mr-eyes/denovo-rnaseq: 1.0.1
+title: "De novo RNA-Seq Snakemake Workflow"
 version: 1.0.1
 date-released: 2023-01-05
+url: "https://github.com/mr-eyes/denovo-rnaseq"
