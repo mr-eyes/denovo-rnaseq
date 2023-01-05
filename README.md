@@ -1,5 +1,7 @@
 # denovo-rnaseq
 
+[![DOI](https://zenodo.org/badge/504349720.svg)](https://zenodo.org/badge/latestdoi/504349720)
+
 ## Description
 - This is a simple Snakemake workflow to perform de novo transcriptome assembly, DGE, and annotation.
 - The workfow currently annotates the highly differential expressed genes with PVal of 0.005 and log_fold_change of 1.
